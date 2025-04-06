@@ -8,13 +8,10 @@ import numpy as np
 class DynamicPricingEnv():
     def __init__(self):
         self.actions = [0, 1, 2]  # 0: decrease, 1: same, 2: increase
-        # self.observation_space = spaces.Box(low=np.array([5, 0]),
-        #                                    high=np.array([50, 500]),
-        #                                    dtype=np.float32)
-        # self.states = self.state_init()
         self.price = 20
-        self.min_price = 15
-        self.max_price = 25
+        self.min_price = 5
+        self.max_price = 50
+
         #The number of weeks in a year
         self.max_steps = 52
         self.current_step = 0
@@ -28,7 +25,7 @@ class DynamicPricingEnv():
         self.revenue = 0
         return np.array([self.price,self.demand,self.current_step], dtype=np.float32)
 
-    def step(self, action, price_change_rate = 0.5):
+    def step(self, action, price_change_rate = 1):
         if action == 0:
             self.price = max(self.min_price, self.price - price_change_rate)
         elif action == 2:
@@ -166,10 +163,10 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
 
     # Plot performance (Total Revenue over Time)
     plt.figure(figsize=(10, 5))
-    plt.plot(range(episodes), total_revenue_per_episode, label="Total Revenue per Episode", color='g')
+    plt.plot(range(episodes), total_revenue_per_episode, label="Total Reward per Episode", color='g')
     plt.xlabel("Episode")
-    plt.ylabel("Total Revenue")
-    plt.title("Total Revenue per Episode Over Training (Monte carlo)")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode Over Training (Monte carlo)")
     plt.legend()
     plt.grid(True)
     plt.show()
