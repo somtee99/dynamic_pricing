@@ -13,6 +13,9 @@ class DynamicPricingEnv():
         #                                    dtype=np.float32)
         # self.states = self.state_init()
         self.price = 20
+        self.min_price = 5
+        self.max_price = 50
+
         #The number of weeks in a year
         self.max_steps = 52
         self.current_step = 0
@@ -28,9 +31,9 @@ class DynamicPricingEnv():
 
     def step(self, action, price_change_rate = 1):
         if action == 0:
-            self.price = max(5, self.price - price_change_rate)
+            self.price = max(self.min_price, self.price - price_change_rate)
         elif action == 2:
-            self.price = min(50, self.price + price_change_rate)
+            self.price = min(self.max_price, self.price + price_change_rate)
 
         # Simulate demand using a simple demand curve
         self.demand = self.calculate_seasonal_demand()
@@ -48,6 +51,7 @@ class DynamicPricingEnv():
         # We are returning the state which consist of the price and demand, then we return the reward value and a boolean
         # indicating if we have completed a 1 year cycle
         return np.array([self.price,self.demand,self.current_step], dtype=np.float32), reward, done
+
 
     def calculate_seasonal_demand(self):
       """Generate demand based on a seasonal curve."""
@@ -74,11 +78,7 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
         step = 0
 
         while not done:
-            if np.random.rand() < epsilon:
-                action =random.randint(0, 2) # Explore
-            else:
-                action = np.argmax(q_table[state])  # Exploit best action
-
+            action = epsilon_greedy(q_table, state, epsilon) 
             next_state, reward, done = env.step(action)
             next_state = tuple(next_state)  # Convert to tuple for indexing
             total_reward += reward
@@ -95,6 +95,7 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
             )
 
             state = next_state
+
         epsilon = max(min_epsilon, epsilon * epsilon_decay)
         total_revenue_per_episode.append(total_revenue)  # Store total revenue for this episode
 
@@ -167,10 +168,10 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
 
     # Plot performance (Total Revenue over Time)
     plt.figure(figsize=(10, 5))
-    plt.plot(range(episodes), total_revenue_per_episode, label="Total Revenue per Episode", color='g')
+    plt.plot(range(episodes), total_revenue_per_episode, label="Total Reward per Episode", color='g')
     plt.xlabel("Episode")
-    plt.ylabel("Total Revenue")
-    plt.title("Total Revenue per Episode Over Training (Monte carlo)")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode Over Training (Monte carlo)")
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -183,6 +184,3 @@ if __name__ == "__main__":
     q_table_monteCarlo = train_dynamic_pricing_monte_carlo(env,episodes=10000)
     env = DynamicPricingEnv()
     q_table_Q_learning = train_dynamic_pricing_q_learning(env,episodes=10000)
-
-
-
