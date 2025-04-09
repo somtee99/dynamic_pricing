@@ -8,6 +8,10 @@ import numpy as np
 class DynamicPricingEnv():
     def __init__(self):
         self.actions = [0, 1, 2]  # 0: decrease, 1: same, 2: increase
+        # self.observation_space = spaces.Box(low=np.array([5, 0]),
+        #                                    high=np.array([50, 500]),
+        #                                    dtype=np.float32)
+        # self.states = self.state_init()
         self.price = 20
         self.min_price = 5
         self.max_price = 50
@@ -15,7 +19,7 @@ class DynamicPricingEnv():
         #The number of weeks in a year
         self.max_steps = 52
         self.current_step = 0
-        self.revenue=0
+        self.revenue=0;
         self.demand = self.calculate_seasonal_demand()
 
     def reset(self):
@@ -47,6 +51,7 @@ class DynamicPricingEnv():
         # We are returning the state which consist of the price and demand, then we return the reward value and a boolean
         # indicating if we have completed a 1 year cycle
         return np.array([self.price,self.demand,self.current_step], dtype=np.float32), reward, done
+
 
     def calculate_seasonal_demand(self):
       """Generate demand based on a seasonal curve."""
