@@ -53,14 +53,35 @@ class DynamicPricingEnv():
         return np.array([self.price,self.demand,self.current_step], dtype=np.float32), reward, done
 
 
+    # def calculate_seasonal_demand(self):
+    #   """Generate demand based on a seasonal curve."""
+    #   week = self.current_step
+    #   seasonal_factor = np.sin((2 * np.pi * week) / 52)  # Sine wave for seasonality
+    #   base_demand = 250  # Average demand
+    #   fluctuation = 150 * seasonal_factor  # Seasonal variation
+    #   noise = np.random.randint(-10, 10)  # Random variation
+    #   return max(0, round(base_demand + fluctuation + noise))
+
     def calculate_seasonal_demand(self):
-      """Generate demand based on a seasonal curve."""
-      week = self.current_step
-      seasonal_factor = np.sin((2 * np.pi * week) / 52)  # Sine wave for seasonality
-      base_demand = 250  # Average demand
-      fluctuation = 150 * seasonal_factor  # Seasonal variation
-      noise = np.random.randint(-10, 10)  # Random variation
-      return max(0, round(base_demand + fluctuation + noise))
+        """Generate demand based on a seasonal curve, considering the price."""
+        week = self.current_step
+        # Seasonal factor based on a sine wave (seasonality effect)
+        seasonal_factor = np.sin((2 * np.pi * week) / 52)  # Sine wave for seasonality (annually)
+        # Base demand (average demand)
+        base_demand = 250
+        # Seasonal fluctuation (up or down based on the time of year)
+        fluctuation = 150 * seasonal_factor
+        # Random noise to simulate unpredictable demand changes
+        noise = np.random.randint(-10, 10)
+        # Price sensitivity: Demand decreases as price increases (price elasticity)
+        # We can adjust this elasticity factor based on how price-sensitive the product is.
+        price_elasticity = -0.5  # Example elasticity: price increase reduces demand
+        # Adjust demand based on price (the higher the price, the lower the demand)
+        price_effect = price_elasticity * (self.price - self.min_price) / (self.max_price - self.min_price)
+        # Total demand considering price, seasonality, and noise
+        demand = base_demand + fluctuation + noise + (base_demand * price_effect)
+        # Ensure demand is non-negative (no negative demand)
+        return max(0, round(demand))
 
 
 def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):

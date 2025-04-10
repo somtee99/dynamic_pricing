@@ -21,7 +21,6 @@ class DynamicPricingEnv(gym.Env):
         self.min_price = 5
         self.max_price = 50
         self.action_space = spaces.Box(low=-1.0 , high=1.0, shape=(1,), dtype=np.float32)
-        # self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)  # Scale actions to [-1, 1]
 
         self.observation_space = spaces.Box(low=np.array([self.min_price, 0,0]),
                                            high=np.array([self.max_price, 500,52]),)
@@ -41,8 +40,6 @@ class DynamicPricingEnv(gym.Env):
         return np.array([self.price,self.demand,self.current_step])
 
     def step(self, action):
-        # self.price = np.clip(action, self.action_space.low, self.action_space.high)
-        previous_price = self.price
 
         previousRevenue = self.revenue
         previous_demand=self.demand
@@ -53,32 +50,10 @@ class DynamicPricingEnv(gym.Env):
         self.revenue = self.price * self.demand
         reward = self.revenue-previousRevenue
 
-        #
-        # price_sensitivity = abs(self.price - previous_price) / previous_price if previous_price != 0 else 0
-        # # reward= self.price - previous_price
-        # # Demand change factor: how much demand changed relative to previous demand
-        # demand_change = abs(self.demand - previous_demand)
-        #
-        # # Year-on-year growth: Reward if revenue increases compared to the previous step (week)
-        # revenue_growth = self.revenue - previousRevenue
-        #
-        # # Reward based on revenue
-        # reward += revenue_growth  # Encourages maximizing revenue growth
-        #
-        # # Penalty for large price fluctuations to encourage stability
-        # reward -= price_sensitivity * 0.5
-        #
-        # # Reward for maintaining demand stability with smaller changes in demand and price
-        # if demand_change < 20 and price_sensitivity < 0.1:
-        #     reward += 0.5
-        # # self.revenue = self.price * self.demand
-        # #
-        # # reward =  self.revenue-previousRevenue
-        # #
-        if self.price != previous_price:
-            reward += 1
-        else:
-            reward -= 1
+        # if self.price != previous_price:
+        #     reward += 1
+        # else:
+        #     reward -= 1
 
             # Update step counter
         self.current_step += 1
@@ -94,29 +69,44 @@ class DynamicPricingEnv(gym.Env):
         return obs,reward, done,{}
 
     def calculate_seasonal_demand(self):
-      """Generate demand based on a seasonal curve."""
-      week = self.current_step
-      seasonal_factor = np.sin((2 * np.pi * week) / 52)  # Sine wave for seasonality
-      base_demand = 250  # Average demand
-      fluctuation = 150 * seasonal_factor  # Seasonal variation
-      noise = np.random.randint(-10, 10)  # Random variation
-      return max(0, round(base_demand + fluctuation + noise))
+        """Generate demand based on a seasonal curve, considering the price."""
+        week = self.current_step
+
+        # Seasonal factor based on a sine wave (seasonality effect)
+        seasonal_factor = np.sin((2 * np.pi * week) / 52)  # Sine wave for seasonality (annually)
+
+        # Base demand (average demand)
+        base_demand = 250
+
+        # Seasonal fluctuation (up or down based on the time of year)
+        fluctuation = 150 * seasonal_factor
+
+        # Random noise to simulate unpredictable demand changes
+        noise = np.random.randint(-10, 10)
+
+        # Price sensitivity: Demand decreases as price increases (price elasticity)
+        # We can adjust this elasticity factor based on how price-sensitive the product is.
+        price_elasticity = -0.5  # Example elasticity: price increase reduces demand
+
+        # Adjust demand based on price (the higher the price, the lower the demand)
+        price_effect = price_elasticity * (self.price - self.min_price) / (self.max_price - self.min_price)
+
+        # Total demand considering price, seasonality, and noise
+        demand = base_demand + fluctuation + noise + (base_demand * price_effect)
+
+        # Ensure demand is non-negative (no negative demand)
+        return max(0, round(demand))
 
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
         pass
 
 
-def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):
+def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.6):
     n_actions = 1
     action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
     lr=0.01
-    ts=5000
     min_epsilon = 0.1
     epsilon_decay = 0.995
-    # learning_rates = [0.001]
-    # timesteps =
-    # for lr in learning_rates:
-    #     for ts in timesteps:
     td3 = TD3(
         "MlpPolicy", env,
         action_noise=action_noise,
@@ -124,11 +114,21 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
         verbose=0,
         # gamma=0.9
     )
-    # Track rewards during training
-    episode_rewards = []  # List to store rewards of each episode
-    td3.learn(total_timesteps=1000)
+    td3.learn(total_timesteps=50000)
+
+    result=evaluate_agent(td3,env,100)
+
+    # Plot them together
+    plt.plot(result, label="TD3")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Revenue")
+    plt.legend()
+    plt.title("TD3 vs Q-Learning on Dynamic Pricing")
+    plt.show()
+    # # Track rewards during training
+    # episode_rewards = []  # List to store rewards of each episode
     # # Training loop with reward tracking
-    # n_episodes = 2 # Total number of episodes to train
+    # n_episodes = 5000 # Total number of episodes to train
     # for episode in range(n_episodes):
     #     obs = env.reset()
     #     done = False
@@ -136,48 +136,49 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
     #
     #     # Run one episode
     #     while not done:
-    #         action= epsilon_greedy(td3,obs,epsilon)  # Stochastic actions for exploration
+    #         action= epsilon_greedy(td3,obs,epsilon,env)  # Stochastic actions for exploration
     #         obs, reward, done, _ = env.step(action)
     #         total_reward += reward  # Accumulate reward
     #
     #     # Log total reward for this episode
     #     episode_rewards.append(total_reward)
-    #
+    #     td3.learn(total_timesteps=1)  # Learning after a batch of experiences
     #     # Perform learning step after each episode
     #
     #     epsilon = max(min_epsilon, epsilon * epsilon_decay)
     #     # Optionally print progress
     #     if episode % 10 == 0:
     #         print(f"Episode {episode}, Total Reward: {total_reward}")
-
-    # Plot the agent's learning progress
-    plt.plot(episode_rewards)
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title("Learning Progress: Total Reward per Episode")
-    plt.show()
-    # # total_revenue_per_episode, episode_length = evaluate_policy(td3, env, n_eval_episodes=ts,return_episode_rewards=True)
-    # plt.figure(figsize=(10, 5))
-    # plt.plot(total_revenue_per_episode, color='green', label='Total Revenue per Episode')
     #
+    # # Plot the agent's learning progress
+    # plt.plot(episode_rewards)
     # plt.xlabel("Episode")
-    # plt.ylabel("Total Revenue")
-    # plt.title(f"td3 config lr {lr} timestep {ts}")
-    # plt.legend()
-    # plt.grid(True)
+    # plt.ylabel("Total Reward")
+    # plt.title("Learning Progress: Total Reward per Episode")
     # plt.show()
 
 
-def epsilon_greedy(model, obs, epsilon):
-    # if np.random.rand() < epsilon:
-    #     action,_ = model.predict(obs, deterministic=False)
-    # else:
-    action,_ = model.predict(obs, deterministic=True)
+def epsilon_greedy(model, obs, epsilon,env):
+    if np.random.rand() < epsilon:
+        action = np.random.uniform(env.action_space.low, env.action_space.high)
+    else:
+        action,_ = model.predict(obs, deterministic=True)
     return action
 
+def evaluate_agent(model, env, n_eval_episodes=100):
+    episode_rewards = []
+    for _ in range(n_eval_episodes):
+        obs = env.reset()
+        done = False
+        total_reward = 0
+        while not done:
+            action, _ = model.predict(obs, deterministic=True)
+            obs, reward, done, _ = env.step(action)
+            total_reward += reward
+        episode_rewards.append(total_reward)
+    return episode_rewards
 
-def train_DQN(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):
-    pass
+
 
 if __name__ == "__main__":
     env = DynamicPricingEnv()
