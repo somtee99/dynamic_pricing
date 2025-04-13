@@ -19,7 +19,9 @@ class DynamicPricingEnv():
         #The number of weeks in a year
         self.max_steps = 52
         self.current_step = 0
-        self.revenue=0;
+        self.revenue=0
+        self.previous_price = 0
+        self.total_revenue = 0
         self.demand = self.calculate_seasonal_demand()
 
     def reset(self):
@@ -27,6 +29,8 @@ class DynamicPricingEnv():
         self.current_step = 0
         self.demand = self.calculate_seasonal_demand()
         self.revenue = 0
+        self.previous_price = 0
+        self.total_revenue = 0
         return np.array([self.price,self.demand,self.current_step], dtype=np.float32)
 
     def step(self, action, price_change_rate = 1):
@@ -41,12 +45,14 @@ class DynamicPricingEnv():
 
         previousRevenue = self.revenue
         self.revenue = self.price * self.demand
+        self.total_revenue +=  self.revenue
 
         reward =  self.revenue-previousRevenue
         # reward =  self.revenue
 
         # Update step counter
         self.current_step += 1
+        self.previous_price = self.price
         done = self.current_step >= self.max_steps  # End of episode (1 year)
         # We are returning the state which consist of the price and demand, then we return the reward value and a boolean
         # indicating if we have completed a 1 year cycle
@@ -54,13 +60,28 @@ class DynamicPricingEnv():
 
 
     def calculate_seasonal_demand(self):
-      """Generate demand based on a seasonal curve."""
-      week = self.current_step
-      seasonal_factor = np.sin((2 * np.pi * week) / 52)  # Sine wave for seasonality
-      base_demand = 250  # Average demand
-      fluctuation = 150 * seasonal_factor  # Seasonal variation
-      noise = np.random.randint(-10, 10)  # Random variation
-      return max(0, round(base_demand + fluctuation + noise))
+        """Generate demand based on a seasonal curve, considering price *and* price change."""
+        week = self.current_step
+
+        # Seasonal factor
+        seasonal_factor = np.sin((2 * np.pi * week) / 52)
+        base_demand = 250
+        fluctuation = 150 * seasonal_factor
+        noise = np.random.randint(-10, 10)
+
+        # Price sensitivity
+        price_elasticity = -0.7
+        price_effect = price_elasticity * (self.price - self.min_price) / (self.max_price - self.min_price)
+
+        # New: Sensitivity to price change
+        price_change_sensitivity = -0.5  # How sensitive is demand to recent price changes?
+        price_change = (self.price - self.previous_price) / (self.max_price - self.min_price)
+        price_change_effect = price_change_sensitivity * price_change
+
+        # Total demand
+        demand = base_demand + fluctuation + noise + (base_demand * (price_effect + price_change_effect))
+
+        return max(0, demand)
 
 
 def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):
@@ -178,9 +199,51 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
     return q_table, total_revenue_per_episode
 
 
+import matplotlib.pyplot as plt
+
+def plot_prices_per_week(env, q_table):
+    state = env.reset()
+    state = tuple(state)
+    total_reward = 0
+    done = False
+
+    prices = []  # Track price per step
+    timesteps = []  # Week numbers
+
+    week = 0
+    while not done:
+        action = np.argmax(q_table[state])
+        state, reward, done = env.step(action)
+        state = tuple(state)
+        total_reward += reward
+
+        # Save the price at this timestep
+        prices.append(env.price)
+        timesteps.append(week)
+        week += 1
+
+    # Plotting the price per timestep
+    plt.figure(figsize=(10, 5))
+    plt.plot(timesteps, prices, marker='o', linestyle='-', color='teal')
+    plt.title('Price per Week (Timestep)')
+    plt.xlabel('Week')
+    plt.ylabel('Price')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return total_reward, env.total_revenue
+
 
 if __name__ == "__main__":
     env = DynamicPricingEnv()
-    q_table_monteCarlo = train_dynamic_pricing_monte_carlo(env,episodes=10000)
+    q_table_monteCarlo,_ = train_dynamic_pricing_monte_carlo(env,episodes=10000)
     env = DynamicPricingEnv()
     q_table_Q_learning = train_dynamic_pricing_q_learning(env,episodes=10000)
+
+    monte_carlo_Evaluation,monte_total_revenue =plot_prices_per_week(DynamicPricingEnv(),q_table_monteCarlo)
+    Q_learning_Evaluation,q_total_revenue = plot_prices_per_week(DynamicPricingEnv(),q_table_Q_learning)
+
+    print(f"Monte Carlo Evaluation {monte_carlo_Evaluation}, Total Revenue {monte_total_revenue}")
+    print(f"Q-Learning Evaluation {Q_learning_Evaluation}, Total Revenue {q_total_revenue}")
+
