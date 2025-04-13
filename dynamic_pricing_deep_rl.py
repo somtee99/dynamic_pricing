@@ -7,6 +7,7 @@ import numpy as np
 from gym.core import RenderFrame
 from stable_baselines3 import DDPG, TD3
 from stable_baselines3.common.noise import NormalActionNoise
+import matplotlib.pyplot as plt
 
 import os
 log_dir ="logs"
@@ -35,6 +36,9 @@ class DynamicPricingEnv(gym.Env):
         norm_demand = min(demand, 500) / 500
         norm_step = step / self.max_steps
         return np.array([norm_price, norm_demand, norm_step], dtype=np.float32)
+    
+    def convert_action_to_price(self, action):
+        return self.min_price + (action + 1) * (self.max_price - self.min_price) / 2
 
     def reset(self):
         self.price = random.uniform(self.min_price,self.max_price)
@@ -46,9 +50,10 @@ class DynamicPricingEnv(gym.Env):
         self.revenue = 0
         self.total_revenue = 0
         return self.normalize_obs(self.price,self.demand,self.current_step)
+    
     def step(self, action):
         previousRevenue = self.revenue
-        self.price = self.min_price + (action[0] + 1) * (self.max_price - self.min_price) / 2
+        self.price = self.convert_action_to_price(action[0])
 
         # Simulate demand using a simple demand curve
         self.demand = self.calculate_seasonal_demand()
@@ -93,8 +98,10 @@ class DynamicPricingEnv(gym.Env):
         demand = base_demand + fluctuation + noise + (base_demand * (price_effect + price_change_effect))
 
         return max(0, demand)
+    
     def render(self) -> Optional[Union[RenderFrame, List[RenderFrame]]]:
-        pass
+        print(f"Step: {self.current_step} | Price: {self.price:.2f} | Demand: {self.demand:.1f} | Revenue: {self.revenue:.2f}")
+
 
 def train_TD3(env):
     n_actions = 1
@@ -107,32 +114,40 @@ def train_TD3(env):
         tensorboard_log=log_dir,
     )
 
-    timesteps =100000
+    timesteps=100000
     iters=0
     while True:
         iters +=1
         td3.learn(total_timesteps=timesteps,reset_num_timesteps=False)
         td3.save(f"{model_dir}/td3 _ {timesteps*iters}")
 
-def rescale_total_reward(total_reward):
-    return total_reward*100
-
-def convert_action_to_price(price,env):
-    return env.min_price + (price + 1) * (env.max_price - env.min_price) / 2
-def evaluate_agent(env):
-    model = TD3.load("models/td3 _ 300000.zip",env=env)
+def plot_prices_per_week(env, model_path="models/td3 _ 300000.zip"):
+    model = TD3.load(model_path, env=env)
     obs = env.reset()
+    
+    prices = []
+    weeks = []
     total_reward = 0
-    done =False
+    done = False
+    
     while not done:
-        action,_ = model.predict(obs)
-        obs,reward,done,_ = env.step(action)
-
+        action, _ = model.predict(obs)
+        obs, reward, done, _ = env.step(action)
+        
+        prices.append(env.price)
+        weeks.append(env.current_step)
         total_reward += reward
-    rescaled_reward=rescale_total_reward(total_reward)
-    print(rescale_total_reward(total_reward))
-    return rescaled_reward,env.total_revenue
+    
+    plt.figure(figsize=(12, 6))
+    plt.plot(weeks, prices, marker='o', linestyle='-')
+    plt.xlabel("Week")
+    plt.ylabel("Price")
+    plt.title("Optimal Prices per Week (TD3 Agent)")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
 
+    print(f"Final Total Revenue: {env.total_revenue:.2f}")
 
 if __name__ == "__main__":
     env = DynamicPricingEnv()
@@ -140,7 +155,6 @@ if __name__ == "__main__":
     #For training model
     # train_TD3(env)
 
-    #for Evaluation models performance
-    td3_evaluation_result,total_revenue=evaluate_agent(env)
-    print(f"TD3 Evaluation {td3_evaluation_result}")
-    print(f"Total Revenue {total_revenue}")
+    #for Evaluation 
+    plot_prices_per_week(env)
+

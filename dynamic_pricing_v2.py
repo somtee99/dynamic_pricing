@@ -19,7 +19,7 @@ class DynamicPricingEnv():
         #The number of weeks in a year
         self.max_steps = 52
         self.current_step = 0
-        self.revenue=0;
+        self.revenue=0
         self.previous_price = 0
         self.total_revenue = 0
         self.demand = self.calculate_seasonal_demand()
@@ -199,18 +199,41 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
     return q_table, total_revenue_per_episode
 
 
-def evaluate_agent(env,q_table):
+import matplotlib.pyplot as plt
+
+def plot_prices_per_week(env, q_table):
     state = env.reset()
     state = tuple(state)
     total_reward = 0
     done = False
+
+    prices = []  # Track price per step
+    timesteps = []  # Week numbers
+
+    week = 0
     while not done:
         action = np.argmax(q_table[state])
-        state,reward,done = env.step(action)
+        state, reward, done = env.step(action)
         state = tuple(state)
         total_reward += reward
 
-    return total_reward,env.total_revenue
+        # Save the price at this timestep
+        prices.append(env.price)
+        timesteps.append(week)
+        week += 1
+
+    # Plotting the price per timestep
+    plt.figure(figsize=(10, 5))
+    plt.plot(timesteps, prices, marker='o', linestyle='-', color='teal')
+    plt.title('Price per Week (Timestep)')
+    plt.xlabel('Week')
+    plt.ylabel('Price')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+    return total_reward, env.total_revenue
+
 
 if __name__ == "__main__":
     env = DynamicPricingEnv()
@@ -218,8 +241,8 @@ if __name__ == "__main__":
     env = DynamicPricingEnv()
     q_table_Q_learning = train_dynamic_pricing_q_learning(env,episodes=10000)
 
-    monte_carlo_Evaluation,monte_total_revenue =evaluate_agent(DynamicPricingEnv(),q_table_monteCarlo)
-    Q_learning_Evaluation,q_total_revenue = evaluate_agent(DynamicPricingEnv(),q_table_Q_learning)
+    monte_carlo_Evaluation,monte_total_revenue =plot_prices_per_week(DynamicPricingEnv(),q_table_monteCarlo)
+    Q_learning_Evaluation,q_total_revenue = plot_prices_per_week(DynamicPricingEnv(),q_table_Q_learning)
 
     print(f"Monte Carlo Evaluation {monte_carlo_Evaluation}, Total Revenue {monte_total_revenue}")
     print(f"Q-Learning Evaluation {Q_learning_Evaluation}, Total Revenue {q_total_revenue}")
