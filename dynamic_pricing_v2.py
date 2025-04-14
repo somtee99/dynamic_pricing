@@ -8,10 +8,6 @@ import numpy as np
 class DynamicPricingEnv():
     def __init__(self):
         self.actions = [0, 1, 2]  # 0: decrease, 1: same, 2: increase
-        # self.observation_space = spaces.Box(low=np.array([5, 0]),
-        #                                    high=np.array([50, 500]),
-        #                                    dtype=np.float32)
-        # self.states = self.state_init()
         self.price = 20
         self.min_price = 5
         self.max_price = 50
@@ -22,6 +18,10 @@ class DynamicPricingEnv():
         self.revenue=0
         self.previous_price = 0
         self.total_revenue = 0
+        self.base_demand=250
+        self.price_elasticity = -0.7
+        #Sensitivity to price change
+        self.price_change_sensitivity = -0.5
         self.demand = self.calculate_seasonal_demand()
 
     def reset(self):
@@ -41,21 +41,18 @@ class DynamicPricingEnv():
 
         # Simulate demand using a simple demand curve
         self.demand = self.calculate_seasonal_demand()
-        # self.demand = max(0, 500 - 10 * self.price + np.random.randint(-10, 10))
 
         previousRevenue = self.revenue
         self.revenue = self.price * self.demand
         self.total_revenue +=  self.revenue
 
         reward =  self.revenue-previousRevenue
-        # reward =  self.revenue
 
         # Update step counter
         self.current_step += 1
         self.previous_price = self.price
         done = self.current_step >= self.max_steps  # End of episode (1 year)
-        # We are returning the state which consist of the price and demand, then we return the reward value and a boolean
-        # indicating if we have completed a 1 year cycle
+
         return np.array([self.price,self.demand,self.current_step], dtype=np.float32), reward, done
 
 
@@ -65,21 +62,18 @@ class DynamicPricingEnv():
 
         # Seasonal factor
         seasonal_factor = np.sin((2 * np.pi * week) / 52)
-        base_demand = 250
         fluctuation = 150 * seasonal_factor
         noise = np.random.randint(-10, 10)
 
         # Price sensitivity
-        price_elasticity = -0.7
-        price_effect = price_elasticity * (self.price - self.min_price) / (self.max_price - self.min_price)
+        price_effect = self.price_elasticity * (self.price - self.min_price) / (self.max_price - self.min_price)
 
-        # New: Sensitivity to price change
-        price_change_sensitivity = -0.5  # How sensitive is demand to recent price changes?
+        #Sensitivity to price change
         price_change = (self.price - self.previous_price) / (self.max_price - self.min_price)
-        price_change_effect = price_change_sensitivity * price_change
+        price_change_effect = self.price_change_sensitivity * price_change
 
         # Total demand
-        demand = base_demand + fluctuation + noise + (base_demand * (price_effect + price_change_effect))
+        demand = self.base_demand + fluctuation + noise + (self.base_demand * (price_effect + price_change_effect))
 
         return max(0, demand)
 
@@ -87,7 +81,7 @@ class DynamicPricingEnv():
 def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):
     q_table = defaultdict(lambda: np.zeros(len(env.actions)))
     # step_rewards = np.zeros(env.max_steps)  # Store cumulative rewards per step
-    total_revenue_per_episode = []  # To track total revenue per episode
+    total_reward_per_episode = []  # To track total reward per episode
     min_epsilon = 0.01
     epsilon_decay = 0.995
     for episode in range(episodes):
@@ -95,15 +89,13 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
         state = tuple(state)  # Convert state to tuple for Q-table indexing
         done = False
         total_reward = 0
-        total_revenue = 0  # Track total revenue for each episode
         step = 0
 
         while not done:
-            action = epsilon_greedy(q_table, state, epsilon) 
+            action = epsilon_greedy(q_table, state, epsilon)
             next_state, reward, done = env.step(action)
             next_state = tuple(next_state)  # Convert to tuple for indexing
             total_reward += reward
-            total_revenue += reward  # Update total revenue for this episode
 
             # Update step rewards
             # step_rewards[step] += reward  # Aggregate reward for this step
@@ -118,18 +110,18 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
             state = next_state
 
         epsilon = max(min_epsilon, epsilon * epsilon_decay)
-        total_revenue_per_episode.append(total_revenue)  # Store total revenue for this episode
+        total_reward_per_episode.append(total_reward)  # Store total reward for this episode
 
         if episode % 100 == 0:
-            print(f"Episode {episode}, Total Reward (Profit): {total_reward}, Total Revenue: {total_revenue}")
+            print(f"Episode {episode}, Total Reward (Profit): {total_reward}, Total Revenue: {env.total_revenue}")
 
 
-    # Plot performance (Total Revenue over Time)
+    # Plot performance (Total Reward over Time)
     plt.figure(figsize=(10, 5))
-    plt.plot(range(episodes), total_revenue_per_episode, label="Total Revenue per Episode", color='g')
+    plt.plot(range(episodes), total_reward_per_episode, label="Total reward per Episode", color='g')
     plt.xlabel("Episode")
-    plt.ylabel("Total Revenue")
-    plt.title("Total Revenue per Episode Over Training (Q-learning)")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode Over Training (Q-learning)")
     plt.legend()
     plt.grid(True)
     plt.show()
@@ -147,7 +139,7 @@ def epsilon_greedy(q_table, state, epsilon):
 def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1):
     q_table = defaultdict(lambda: np.zeros(len(env.actions)))
     returns= defaultdict(lambda: [])
-    total_revenue_per_episode = []
+    total_reward_per_episode = []
     min_epsilon = 0.01
     epsilon_decay = 0.995
 
@@ -160,7 +152,6 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
         state = tuple(state)
         done = False
         total_reward = 0
-        total_revenue = 0
 
         while not done:
             action = epsilon_greedy(q_table, state, epsilon)
@@ -169,10 +160,9 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
             episode.append((state, action, reward))
             state = next_state
             total_reward += reward
-            total_revenue += reward
 
         epsilon = max(min_epsilon, epsilon * epsilon_decay)
-        total_revenue_per_episode.append(total_reward)
+        total_reward_per_episode.append(total_reward)
 
         # Update Q-values using first-visit Monte Carlo
         G = 0
@@ -185,23 +175,23 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
                 q_table[state][action] = np.mean(returns[(state, action)])
 
         if i % 100 == 0:
-            print(f"Episode {i}, Total Reward (Profit): {total_reward}, Total Revenue: {total_revenue}")
+            print(f"Episode {i}, Total Reward (Profit): {total_reward}, Total Revenue: {env.total_revenue}")
 
     # Plot performance (Total Revenue over Time)
     plt.figure(figsize=(10, 5))
-    plt.plot(range(episodes), total_revenue_per_episode, label="Total Reward per Episode", color='g')
+    plt.plot(range(episodes), total_reward_per_episode, label="Total Reward per Episode", color='g')
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.title("Total Reward per Episode Over Training (Monte carlo)")
     plt.legend()
     plt.grid(True)
     plt.show()
-    return q_table, total_revenue_per_episode
+    return q_table
 
 
 import matplotlib.pyplot as plt
 
-def plot_prices_per_week(env, q_table):
+def evaluate_agent(env, q_table):
     state = env.reset()
     state = tuple(state)
     total_reward = 0
@@ -237,13 +227,12 @@ def plot_prices_per_week(env, q_table):
 
 if __name__ == "__main__":
     env = DynamicPricingEnv()
-    q_table_monteCarlo,_ = train_dynamic_pricing_monte_carlo(env,episodes=10000)
+    q_table_monteCarlo = train_dynamic_pricing_monte_carlo(env,episodes=10000)
     env = DynamicPricingEnv()
     q_table_Q_learning = train_dynamic_pricing_q_learning(env,episodes=10000)
 
-    monte_carlo_Evaluation,monte_total_revenue =plot_prices_per_week(DynamicPricingEnv(),q_table_monteCarlo)
-    Q_learning_Evaluation,q_total_revenue = plot_prices_per_week(DynamicPricingEnv(),q_table_Q_learning)
+    monte_carlo_Evaluation,monte_total_revenue =evaluate_agent(DynamicPricingEnv(),q_table_monteCarlo)
+    Q_learning_Evaluation,q_total_revenue = evaluate_agent(DynamicPricingEnv(),q_table_Q_learning)
 
     print(f"Monte Carlo Evaluation {monte_carlo_Evaluation}, Total Revenue {monte_total_revenue}")
     print(f"Q-Learning Evaluation {Q_learning_Evaluation}, Total Revenue {q_total_revenue}")
-
