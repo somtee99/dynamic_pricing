@@ -197,8 +197,9 @@ def evaluate_agent(env, q_table):
     total_reward = 0
     done = False
 
-    prices = []  # Track price per step
-    timesteps = []  # Week numbers
+    prices = []
+    demands = []
+    timesteps = []
 
     week = 0
     while not done:
@@ -207,19 +208,28 @@ def evaluate_agent(env, q_table):
         state = tuple(state)
         total_reward += reward
 
-        # Save the price at this timestep
         prices.append(env.price)
+        demands.append(env.demand)
         timesteps.append(week)
         week += 1
 
-    # Plotting the price per timestep
-    plt.figure(figsize=(10, 5))
-    plt.plot(timesteps, prices, marker='o', linestyle='-', color='teal')
-    plt.title('Price per Week (Timestep)')
-    plt.xlabel('Week')
-    plt.ylabel('Price')
+    # Plotting both Price and Demand
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    ax1.set_xlabel("Week")
+    ax1.set_ylabel("Price", color='tab:blue')
+    ax1.plot(timesteps, prices, marker='o', linestyle='-', color='tab:blue', label='Price')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+
+    # Create a second y-axis for demand
+    ax2 = ax1.twinx()
+    ax2.set_ylabel("Demand", color='tab:red')
+    ax2.plot(timesteps, demands, marker='x', linestyle='--', color='tab:red', label='Demand')
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+
+    plt.title('Price and Demand per Week for Evaluation')
+    fig.tight_layout()
     plt.grid(True)
-    plt.tight_layout()
     plt.show()
 
     return total_reward, env.total_revenue

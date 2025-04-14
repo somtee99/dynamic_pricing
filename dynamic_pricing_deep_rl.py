@@ -123,36 +123,51 @@ def train_TD3(env):
 
 def rescale_total_reward(total_reward):
     return total_reward*100
+
 def evaluate_agent(env, model_path="models/td3 _ 300000.zip"):
     model = TD3.load(model_path, env=env)
     state = env.reset()
-    
+
     prices = []
+    demands = []
     weeks = []
     total_reward = 0
     done = False
-    
+
     while not done:
         action, _ = model.predict(state)
         state, reward, done, _ = env.step(action)
+        
         prices.append(env.price)
+        demands.append(env.demand)
         weeks.append(env.current_step)
         total_reward += reward
-    
-    plt.figure(figsize=(12, 6))
-    plt.plot(weeks, prices, marker='o', linestyle='-')
-    plt.xlabel("Week")
-    plt.ylabel("Price")
-    plt.title("Optimal Prices per Week (TD3 Agent)")
+
+    # Plotting prices and demand per week using twin axes
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+
+    color = 'tab:blue'
+    ax1.set_xlabel('Week')
+    ax1.set_ylabel('Price', color=color)
+    ax1.plot(weeks, prices, marker='o', linestyle='-', color=color, label='Price')
+    ax1.tick_params(axis='y', labelcolor=color)
+
+    ax2 = ax1.twinx()
+    color = 'tab:green'
+    ax2.set_ylabel('Demand', color=color)
+    ax2.plot(weeks, demands, marker='s', linestyle='--', color=color, label='Demand')
+    ax2.tick_params(axis='y', labelcolor=color)
+
+    plt.title("Optimal Prices and Demand per Week (TD3 Agent)")
+    fig.tight_layout()
     plt.grid(True)
-    plt.tight_layout()
     plt.show()
 
     print(f"Final Total Revenue: {env.total_revenue:.2f}")
-    rescaled_reward=rescale_total_reward(total_reward)
-    print(rescale_total_reward(total_reward))
-    return rescaled_reward,env.total_revenue
-
+    rescaled_reward = rescale_total_reward(total_reward)
+    print(f"Rescaled Total Reward: {rescaled_reward}")
+    
+    return rescaled_reward, env.total_revenue
 
 
 if __name__ == "__main__":
