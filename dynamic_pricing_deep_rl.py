@@ -21,7 +21,7 @@ class DynamicPricingEnv(gym.Env):
         self.min_price = 5
         self.max_price = 50
         self.price = random.uniform(self.min_price,self.max_price)
-        self.action_space = spaces.Box(low=-2.0 , high=2.0, shape=(1,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-1.0 , high=1.0, shape=(1,), dtype=np.float32)
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(3,), dtype=np.float32)
         self.max_steps = 52
         self.current_step = 0
@@ -174,10 +174,10 @@ if __name__ == "__main__":
     env = DynamicPricingEnv()
 
     #For training model
-    train_TD3(env)
+    #train_TD3(env)
 
     #for Evaluation
-    # td3_evaluation_result,total_revenue=evaluate_agent(env)
-    # print(f"TD3 Evaluation {td3_evaluation_result}")
-    # print(f"Total Revenue {total_revenue}")
+    td3_evaluation_result,total_revenue=evaluate_agent(env)
+    print(f"TD3 Evaluation {td3_evaluation_result}")
+    print(f"Total Revenue {total_revenue}")
 
