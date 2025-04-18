@@ -15,6 +15,7 @@ model_dir ="models"
 
 os.makedirs(log_dir,exist_ok=True)
 os.makedirs(model_dir,exist_ok=True)
+
 class DynamicPricingEnv(gym.Env):
     def __init__(self):
         super(DynamicPricingEnv, self).__init__()
@@ -22,15 +23,19 @@ class DynamicPricingEnv(gym.Env):
         self.max_price = 50
         self.price = random.uniform(self.min_price,self.max_price)
         self.action_space = spaces.Box(low=-1.0 , high=1.0, shape=(1,), dtype=np.float32)
+        #observation spaces are current price,current demand, and current week
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(3,), dtype=np.float32)
         self.max_steps = 52
         self.current_step = 0
         self.revenue=0
-        self.avg_previous_revenue = 0
         self.previous_price = 0
         self.total_revenue = 0
         self.base_demand=250
+        # The price elasticity of demand, which indicates how sensitive demand is to price changes.
+        #The impact that an increase in price has on the demand
         self.price_elasticity = -0.7
+        # The sensitivity of demand to recent price changes.
+        #The impact the difference between the previous price and current price will have on the demand
         self.price_change_sensitivity = -0.5
         self.demand = self.calculate_seasonal_demand()
 
@@ -124,7 +129,7 @@ def train_TD3(env):
 def rescale_total_reward(total_reward):
     return total_reward*100
 
-def evaluate_agent(env, model_path="models/td3 _ 300000.zip"):
+def evaluate_agent(env, model_path="models/td3 _ 300000.zip",show_plot=True):
     model = TD3.load(model_path, env=env)
     state = env.reset()
 
@@ -143,25 +148,26 @@ def evaluate_agent(env, model_path="models/td3 _ 300000.zip"):
         weeks.append(env.current_step)
         total_reward += reward
 
-    # Plotting prices and demand per week using twin axes
-    fig, ax1 = plt.subplots(figsize=(12, 6))
+    if show_plot:
+        # Plotting prices and demand per week using twin axes
+        fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    color = 'tab:blue'
-    ax1.set_xlabel('Week')
-    ax1.set_ylabel('Price', color=color)
-    ax1.plot(weeks, prices, marker='o', linestyle='-', color=color, label='Price')
-    ax1.tick_params(axis='y', labelcolor=color)
+        color = 'tab:blue'
+        ax1.set_xlabel('Week')
+        ax1.set_ylabel('Price', color=color)
+        ax1.plot(weeks, prices, marker='o', linestyle='-', color=color, label='Price')
+        ax1.tick_params(axis='y', labelcolor=color)
 
-    ax2 = ax1.twinx()
-    color = 'tab:green'
-    ax2.set_ylabel('Demand', color=color)
-    ax2.plot(weeks, demands, marker='s', linestyle='--', color=color, label='Demand')
-    ax2.tick_params(axis='y', labelcolor=color)
+        ax2 = ax1.twinx()
+        color = 'tab:green'
+        ax2.set_ylabel('Demand', color=color)
+        ax2.plot(weeks, demands, marker='s', linestyle='--', color=color, label='Demand')
+        ax2.tick_params(axis='y', labelcolor=color)
 
-    plt.title("Optimal Prices and Demand per Week (TD3 Agent)")
-    fig.tight_layout()
-    plt.grid(True)
-    plt.show()
+        plt.title("Optimal Prices and Demand per Week (TD3 Agent)")
+        fig.tight_layout()
+        plt.grid(True)
+        plt.show()
 
     print(f"Final Total Revenue: {env.total_revenue:.2f}")
     rescaled_reward = rescale_total_reward(total_reward)
@@ -174,7 +180,7 @@ if __name__ == "__main__":
     env = DynamicPricingEnv()
 
     #For training model
-    #train_TD3(env)
+    # train_TD3(env)
 
     #for Evaluation
     td3_evaluation_result,total_revenue=evaluate_agent(env)

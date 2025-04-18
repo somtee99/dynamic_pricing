@@ -78,7 +78,7 @@ class DynamicPricingEnv():
         return max(0, demand)
 
 
-def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1):
+def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, epsilon=0.1,show_plot=True):
     q_table = defaultdict(lambda: np.zeros(len(env.actions)))
     # step_rewards = np.zeros(env.max_steps)  # Store cumulative rewards per step
     total_reward_per_episode = []  # To track total reward per episode
@@ -115,16 +115,16 @@ def train_dynamic_pricing_q_learning(env, episodes=1000, alpha=0.1, gamma=0.9, e
         if episode % 100 == 0:
             print(f"Episode {episode}, Total Reward (Profit): {total_reward}, Total Revenue: {env.total_revenue}")
 
-
-    # Plot performance (Total Reward over Time)
-    plt.figure(figsize=(10, 5))
-    plt.plot(range(episodes), total_reward_per_episode, label="Total reward per Episode", color='g')
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title("Total Reward per Episode Over Training (Q-learning)")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    if show_plot:
+        # Plot performance (Total Reward over Time)
+        plt.figure(figsize=(10, 5))
+        plt.plot(range(episodes), total_reward_per_episode, label="Total reward per Episode", color='g')
+        plt.xlabel("Episode")
+        plt.ylabel("Total Reward")
+        plt.title("Total Reward per Episode Over Training (Q-learning)")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
     return q_table
 
@@ -136,7 +136,7 @@ def epsilon_greedy(q_table, state, epsilon):
         action = np.argmax(q_table[state])
     return action
 
-def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1):
+def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1, show_plot=True):
     q_table = defaultdict(lambda: np.zeros(len(env.actions)))
     returns= defaultdict(lambda: [])
     total_reward_per_episode = []
@@ -177,21 +177,21 @@ def train_dynamic_pricing_monte_carlo(env, episodes=1000, gamma=0.9, epsilon=0.1
         if i % 100 == 0:
             print(f"Episode {i}, Total Reward (Profit): {total_reward}, Total Revenue: {env.total_revenue}")
 
-    # Plot performance (Total Revenue over Time)
-    plt.figure(figsize=(10, 5))
-    plt.plot(range(episodes), total_reward_per_episode, label="Total Reward per Episode", color='g')
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title("Total Reward per Episode Over Training (Monte carlo)")
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    if show_plot:
+    #Plot performance (Total Revenue over Time)
+        plt.figure(figsize=(10, 5))
+        plt.plot(range(episodes), total_reward_per_episode, label="Total Reward per Episode", color='g')
+        plt.xlabel("Episode")
+        plt.ylabel("Total Reward")
+        plt.title("Total Reward per Episode Over Training (Monte carlo)")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
     return q_table
 
 
-import matplotlib.pyplot as plt
 
-def evaluate_agent(env, q_table):
+def evaluate_agent(env, q_table, show_plot=True):
     state = env.reset()
     state = tuple(state)
     total_reward = 0
@@ -213,24 +213,25 @@ def evaluate_agent(env, q_table):
         timesteps.append(week)
         week += 1
 
-    # Plotting both Price and Demand
-    fig, ax1 = plt.subplots(figsize=(12, 6))
+    if show_plot:
+        #Plotting both Price and Demand
+        fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    ax1.set_xlabel("Week")
-    ax1.set_ylabel("Price", color='tab:blue')
-    ax1.plot(timesteps, prices, marker='o', linestyle='-', color='tab:blue', label='Price')
-    ax1.tick_params(axis='y', labelcolor='tab:blue')
+        ax1.set_xlabel("Week")
+        ax1.set_ylabel("Price", color='tab:blue')
+        ax1.plot(timesteps, prices, marker='o', linestyle='-', color='tab:blue', label='Price')
+        ax1.tick_params(axis='y', labelcolor='tab:blue')
 
-    # Create a second y-axis for demand
-    ax2 = ax1.twinx()
-    ax2.set_ylabel("Demand", color='tab:red')
-    ax2.plot(timesteps, demands, marker='x', linestyle='--', color='tab:red', label='Demand')
-    ax2.tick_params(axis='y', labelcolor='tab:red')
+        # Create a second y-axis for demand
+        ax2 = ax1.twinx()
+        ax2.set_ylabel("Demand", color='tab:red')
+        ax2.plot(timesteps, demands, marker='x', linestyle='--', color='tab:red', label='Demand')
+        ax2.tick_params(axis='y', labelcolor='tab:red')
 
-    plt.title('Price and Demand per Week for Evaluation')
-    fig.tight_layout()
-    plt.grid(True)
-    plt.show()
+        plt.title('Price and Demand per Week for Evaluation')
+        fig.tight_layout()
+        plt.grid(True)
+        plt.show()
 
     return total_reward, env.total_revenue
 
