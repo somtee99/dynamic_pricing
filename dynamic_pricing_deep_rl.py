@@ -124,7 +124,7 @@ def train_TD3(env):
     while True:
         iters +=1
         td3.learn(total_timesteps=timesteps,reset_num_timesteps=False)
-        td3.save(f"{model_dir}/td3 _ {timesteps*iters}")
+        td3.save(f"{model_dir}/td3 _ {timesteps*iters}
 
 def rescale_total_reward(total_reward):
     return total_reward*100
@@ -180,10 +180,10 @@ if __name__ == "__main__":
     env = DynamicPricingEnv()
 
     #For training model
-    # train_TD3(env)
+    train_TD3(env)
 
     #for Evaluation
-    td3_evaluation_result,total_revenue=evaluate_agent(env)
-    print(f"TD3 Evaluation {td3_evaluation_result}")
-    print(f"Total Revenue {total_revenue}")
+    # td3_evaluation_result,total_revenue=evaluate_agent(env)
+    # print(f"TD3 Evaluation {td3_evaluation_result}")
+    # print(f"Total Revenue {total_revenue}")
 
